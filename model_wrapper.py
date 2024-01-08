@@ -178,8 +178,6 @@ class CompressedModel(nn.Module, ModuleUtilsMixin):
         def merge(x: torch.Tensor, mode="mean") -> torch.Tensor:
             # src, dst = x[..., ::2, :], x[..., 1::2, :]
             src, dst = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :]
-            # src, dst, ori_dst = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :], x[batch_idx,  c_idx, :]
-            # src, dst = x[batch_idx, min_indices[:, :T-r], :], x[batch_idx,  min_indices[:,T-r:], :]
             n, t1, c = src.shape
             unm = src.gather(dim=-2, index=unm_idx.expand(n, t1 - r, c))
             src = src.gather(dim=-2, index=src_idx.expand(n, r, c))
@@ -203,10 +201,10 @@ class CompressedModel(nn.Module, ModuleUtilsMixin):
         if size is None:
             size = torch.ones_like(x[..., 0, None])
 
-        x = merge(x * size, mode="mean")
-        # size = merge(size, mode="sum")
+        x = merge(x * size, mode="sum")
+        size = merge(size, mode="sum")
 
-        # x = x / size
+        x = x / size
         return x, None 
             
     def random_filter_with_r(self, x, use_mean=False, k = 2):        

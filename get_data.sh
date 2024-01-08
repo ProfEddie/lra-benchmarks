@@ -1,5 +1,5 @@
-mkdir datasets
-cd datasets
+mkdir -p  /mnt/data/mount_4TBSSD/nmduy/lra 
+cd /mnt/data/mount_4TBSSD/nmduy/lra
 wget https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
 tar -xvf cifar-10-python.tar.gz
 wget https://storage.googleapis.com/long-range-arena/lra_release.gz

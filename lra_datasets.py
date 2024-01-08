@@ -5,11 +5,11 @@ from functools import reduce
 import torch
 from glob import glob
 from itertools import cycle
-
+data_path = '/mnt/data/mount_4TBSSD/nmduy/lra'
 
 class ImdbDataset:
     def __init__(self, config, split='train'):       
-        data_paths = {'train': "datasets/aclImdb/train", 'eval': "datasets/aclImdb/test"}
+        data_paths = {'train': f"{data_path}/aclImdb/train", 'eval': f"{data_path}/aclImdb/test"}
         split_path = data_paths[split]
         neg_path = split_path + "/neg"
         pos_path = split_path + "/pos"
@@ -24,9 +24,8 @@ class ImdbDataset:
         data = self.data[i]
         with open(data[0], 'r') as fo:
             source = fo.read()
-        inputs = self.tokenizer(source, max_length=self.max_length)
         target = int(data[1])
-        return inputs, torch.LongTensor([target])
+        return source, torch.LongTensor([target])
     
     def __len__(self):
         return len(self.data)
@@ -35,8 +34,8 @@ class ImdbDataset:
 class ListOpsDataset:
     def __init__(self, config, split='train'):
         
-        data_paths = {'train': "datasets/lra_release/listops-1000/basic_train.tsv",
-                      'eval': "datasets/lra_release/listops-1000/basic_val.tsv"}
+        data_paths = {'train': f"{data_path}/lra_release/listops-1000/basic_train.tsv",
+                      'eval': f"{data_path}/lra_release/listops-1000/basic_val.tsv"}
         self.data = pd.read_csv(data_paths[split], delimiter='\t')
         self.tokenizer = config.tokenizer
         self.max_length = config.max_length
@@ -54,8 +53,8 @@ class ListOpsDataset:
 
 class Cifar10Dataset:
     def __init__(self, config, split='train'):
-        data_paths = {'train': [f"datasets/cifar-10-batches-py/data_batch_{i}" for i in range(1, 6)],
-                      'eval': ["datasets/cifar-10-batches-py/test_batch"]
+        data_paths = {'train': [f"{data_path}/cifar-10-batches-py/data_batch_{i}" for i in range(1, 6)],
+                      'eval': [f"{data_path}/cifar-10-batches-py/test_batch"]
                      }
         print("loading cifar-10 data...")
         data_dicts = [Cifar10Dataset.unpickle(path) for path in data_paths[split]]

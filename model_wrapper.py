@@ -22,7 +22,7 @@ class CompressedModel(nn.Module, ModuleUtilsMixin):
         self.r = r
         self.window_size=window_size
         self.compress_method = compress_method
-        self.num_reduced_token =8 
+        self.num_reduced_token = 12 
     
 
     def std_filter_with_r(self, x, k = 2):        
@@ -318,16 +318,17 @@ class CompressedModel(nn.Module, ModuleUtilsMixin):
             # x_reconstructed, energy = self.random_filter_with_r(x, k=self.num_reduced_token, use_mean=False) 
             x_reconstructed, energy = self.random_filter_with_r(x, k=None) 
         elif self.compress_method == 'std-weighted-merge':
-            merge = self.std_based_bipartite_soft_matching(x, None) 
+            merge = self.std_based_bipartite_soft_matching(x, self.num_reduced_token) 
+            # merge = self.std_based_bipartite_soft_matching(x, None) 
             x_reconstructed, energy = self.merge_wavg(merge, x) 
             # x_reconstructed, energy  = self.std_based(x, None) 
 
         elif self.compress_method == 'std-mean-merge':
-            # x_reconstructed, energy = self.std_filter_with_r(x, k=self.num_reduced_token) 
-            x_reconstructed, energy = self.std_filter_with_r(x,k=None) 
+            x_reconstructed, energy = self.std_filter_with_r(x, k=self.num_reduced_token) 
+            # x_reconstructed, energy = self.std_filter_with_r(x,k=None) 
         elif self.compress_method == 'bipartite-soft-matching':
-            # merge = self.bipartite_soft_matching(x, self.num_reduced_token) 
-            merge = self.bipartite_soft_matching(x, None) 
+            merge = self.bipartite_soft_matching(x, self.num_reduced_token) 
+            # merge = self.bipartite_soft_matching(x, None) 
             x_reconstructed, energy = self.merge_wavg(merge, x) 
         else: 
             return x, x

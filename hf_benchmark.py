@@ -138,28 +138,27 @@ if __name__ == "__main__":
     batch_size = 4 
     avg_factor = 0.95
     task_name = args.task
-    # model_ckt = 'lvwerra/bert-imdb'
-    model_ckt = 'JiaqiLee/imdb-finetuned-bert-base-uncased'
+    model_ckt = 'lvwerra/bert-imdb'
+    # model_ckt = 'JiaqiLee/imdb-finetuned-bert-base-uncased'
     # compress_method='random-mean-merge' 
     # compress_method='std-mean-merge' 
     # compress_method='none' 
     # compress_method='dct'
-    compress_method='std-weighted-merge' 
-    # compress_method='bipartite-soft-matching'
+    # compress_method='std-weighted-merge' 
+    compress_method='bipartite-soft-matching'
     print('using', compress_method)
     model, tokenizer = get_model(
         model_ckt, 
         compress_method=compress_method,
-        r=0.85
+        r=0.925
     )
+    print(model)
     task = TASKS[task_name]
     config, model_config = task.config_getter()    
     config.tokenizer = tokenizer
 
-    
-    
     dataset = task.dataset_fn(config, split='train')
     eval_dataset = task.dataset_fn(config, split='eval')    
     max_train_steps = int(np.ceil(config.total_train_samples / batch_size))
 
-    eval(model, eval_dataset, tokenizer ,batch_size=25)
+    eval(model, eval_dataset, tokenizer ,batch_size=5)

@@ -80,6 +80,47 @@ class CompressedModel(nn.Module, ModuleUtilsMixin):
       
         return output, None 
     
+    def std_based_bipartite_soft_matching(
+        self,
+        x: torch.Tensor,
+        r: int=None,
+    ):
+        T = x.shape[1]
+
+        protected = 0
+        if r is None:
+            r = math.floor(T- T*self.r)
+        # We can only reduce by a maximum of 50% tokens
+        r = min(r, (T - protected) // 2)
+
+        if r <= 0:
+            return x, x
+
+        with torch.no_grad():
+            batch_idx = torch.arange(x.shape[0]).unsqueeze(1)
+            x = F.normalize(x, p=2, dim=-1)
+            ori_score =x@x.transpose(-1,-2) - (torch.eye(x.shape[1])).unsqueeze(0).to(x.device)
+            ori_score = torch.where(ori_score > 0.5, ori_score, 0.0)
+            _, min_indices = torch.topk(ori_score.mean(dim=-2) , k=2*r)
+            mask_to_keep = torch.ones_like(x, dtype=torch.bool)
+            mask_to_keep[batch_idx, min_indices,  :] = False
+            a_idx, b_idx = min_indices[..., ::2], min_indices[..., 1::2]
+            a, b = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :]
+            scores = a@b.transpose(-1,-2) 
+            _, dst_idx = scores.max(dim=-1) 
+
+        def merge(x: torch.Tensor, mode="mean") -> torch.Tensor:
+            ori = torch.masked_select(x, mask_to_keep).view(x.size(0), -1, x.size(2))
+            src, dst = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :]
+            n, _, c = src.shape
+            dst = dst.scatter_reduce(-2, dst_idx.unsqueeze_(2).expand(n, r, c), src, reduce=mode)
+
+            return torch.cat([ori, dst], dim=1)
+            # return torch.cat([unm, dst], dim=1)
+
+       
+
+        return merge
     
 
     def bipartite_soft_matching(
@@ -129,66 +170,60 @@ class CompressedModel(nn.Module, ModuleUtilsMixin):
 
         return merge
 
-    def std_based_bipartite_soft_matching(
-        self,
-        x: torch.Tensor,
-        r: int=None,
-    ):
-        T = x.shape[1]
+    # def std_based_bipartite_soft_matching(
+    #     self,
+    #     x: torch.Tensor,
+    #     r: int=None,
+    # ):
+    #     T = x.shape[1]
 
-        protected = 0
-        if r is None:
-            r = math.floor(T- T*self.r)
-            # print(r)
+    #     protected = 0
+    #     if r is None:
+    #         r = math.floor(T- T*self.r)
+    #         # print(r)
     
-        # We can only reduce by a maximum of 50% tokens
-        r = min(r, (T - protected) // 2)
+    #     # We can only reduce by a maximum of 50% tokens
+    #     r = min(r, (T - protected) // 2)
 
-        if r <= 0:
-            return x, x
+    #     if r <= 0:
+    #         return x, x
 
-        with torch.no_grad():
-            batch_idx = torch.arange(x.shape[0]).unsqueeze(1)
+    #     with torch.no_grad():
+    #         batch_idx = torch.arange(x.shape[0]).unsqueeze(1)
             
 
             
-            min_indices = torch.argsort(x.std(-1),dim=-1)
-            x = F.normalize(x, p=2, dim=-1) 
-            a_idx, b_idx = min_indices[..., ::2], min_indices[..., 1::2]
-            a, b = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :]
-            # a, b= x[..., ::2, :], x[..., 1::2, :]
+    #         min_indices = torch.argsort(x.std(-1),dim=-1)
+    #         x = F.normalize(x, p=2, dim=-1) 
+    #         a_idx, b_idx = min_indices[..., ::2], min_indices[..., 1::2]
+    #         a, b = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :]
+    #         # a, b= x[..., ::2, :], x[..., 1::2, :]
+    #         scores = a @ b.transpose(-1, -2) 
+    #         scores = (scores.transpose(-1,-2) - a.std(-1).unsqueeze(1)).transpose(-1,-2)
+    #         node_max, node_idx = scores.max(dim=-1) 
+    #         # print(node_idx[0])
+    #         edge_idx = node_max.argsort(dim=-1, descending=True)[..., None]
+    #         # print(node_max)
+
+    #         unm_idx = edge_idx[..., r:, :]  # Unmerged Tokens
+    #         src_idx = edge_idx[..., :r, :]  # Merged Tokens
+    #         dst_idx = node_idx[..., None].gather(dim=-2, index=src_idx)
 
 
-            
-            scores = a @ b.transpose(-1, -2) 
-            scores = (scores.transpose(-1,-2) - a.std(-1).unsqueeze(1)).transpose(-1,-2)
+    #     def merge(x: torch.Tensor, mode="mean") -> torch.Tensor:
+    #         # src, dst = x[..., ::2, :], x[..., 1::2, :]
+    #         src, dst = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :]
+    #         n, t1, c = src.shape
+    #         unm = src.gather(dim=-2, index=unm_idx.expand(n, t1 - r, c))
+    #         src = src.gather(dim=-2, index=src_idx.expand(n, r, c))
+    #         dst = dst.scatter_reduce(-2, dst_idx.expand(n, r, c), src, reduce=mode)
+
+    #         # return torch.cat([unm, dst, ori_dst], dim=1)
+    #         return torch.cat([unm, dst], dim=1)
 
        
 
-            node_max, node_idx = scores.max(dim=-1) 
-            # print(node_idx[0])
-            edge_idx = node_max.argsort(dim=-1, descending=True)[..., None]
-            # print(node_max)
-
-            unm_idx = edge_idx[..., r:, :]  # Unmerged Tokens
-            src_idx = edge_idx[..., :r, :]  # Merged Tokens
-            dst_idx = node_idx[..., None].gather(dim=-2, index=src_idx)
-
-
-        def merge(x: torch.Tensor, mode="mean") -> torch.Tensor:
-            # src, dst = x[..., ::2, :], x[..., 1::2, :]
-            src, dst = x[batch_idx, a_idx, :], x[batch_idx,  b_idx, :]
-            n, t1, c = src.shape
-            unm = src.gather(dim=-2, index=unm_idx.expand(n, t1 - r, c))
-            src = src.gather(dim=-2, index=src_idx.expand(n, r, c))
-            dst = dst.scatter_reduce(-2, dst_idx.expand(n, r, c), src, reduce=mode)
-
-            # return torch.cat([unm, dst, ori_dst], dim=1)
-            return torch.cat([unm, dst], dim=1)
-
-       
-
-        return merge
+    #     return merge
 
 
     def merge_wavg(
@@ -201,10 +236,10 @@ class CompressedModel(nn.Module, ModuleUtilsMixin):
         if size is None:
             size = torch.ones_like(x[..., 0, None])
 
-        x = merge(x * size, mode="sum")
-        size = merge(size, mode="sum")
+        x = merge(x * size, mode="mean")
+        # size = merge(size, mode="sum")
 
-        x = x / size
+        # x = x / size
         return x, None 
             
     def random_filter_with_r(self, x, use_mean=False, k = 2):        

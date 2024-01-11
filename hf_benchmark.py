@@ -150,7 +150,7 @@ if __name__ == "__main__":
     model, tokenizer = get_model(
         model_ckt, 
         compress_method=compress_method,
-        r=0.925
+        r=0.85
     )
     task = TASKS[task_name]
     config, model_config = task.config_getter()    
@@ -162,4 +162,4 @@ if __name__ == "__main__":
     eval_dataset = task.dataset_fn(config, split='eval')    
     max_train_steps = int(np.ceil(config.total_train_samples / batch_size))
 
-    eval(model, eval_dataset, tokenizer ,batch_size=15)
+    eval(model, eval_dataset, tokenizer ,batch_size=25)
